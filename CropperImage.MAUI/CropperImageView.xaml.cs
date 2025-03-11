@@ -720,32 +720,63 @@ public partial class CropperImageView : ContentView
             if (cropping)
             {
                 canvas.Clear();
-                if (CropperRadiusPer > 0)
+                float CropRadius = Math.Min(e.Info.Width, e.Info.Height) /2 * CropperRadiusPer / 100f;
+                float cropX, cropY, cropWidth, cropHeight;
+                
+                if (CropperFigure == GeometryType.Circle)
                 {
-                    float CropRadius = Math.Min(e.Info.Width, e.Info.Height) / 2 * CropperRadiusPer / 100f;
-                    if (!cropRect && CropperFigure == GeometryType.Circle)
-                        canvas.ClipRoundRect(new SKRoundRect(SKRect.Create(e.Info.Width / 2 - CropRadius, e.Info.Height / 2 - CropRadius, CropRadius * 2, CropRadius * 2), CropRadius * 2));
-                    var pictureFrameCrop = SKRect.Create(imageX, imageY, e.Info.Width * imageScale, e.Info.Height * imageScale);
-                    var destCrop = pictureFrameCrop.AspectFit(new SKSize(image.Width, image.Height));
-                    canvas.DrawImage(image, destCrop);
-                    var snap = e.Surface.Snapshot(SKRectI.Create((int)(e.Info.Width / 2 - CropRadius), (int)(e.Info.Height / 2 - CropRadius), (int)(CropRadius * 2), (int)(CropRadius * 2)));
-                    croppedImage = snap;
-                    imageData = snap.Encode().ToArray();
+                    cropX = e.Info.Width / 2 - CropRadius;
+                    cropY = e.Info.Height / 2 - CropRadius;
+                    cropWidth = CropRadius * 2;
+                    cropHeight = CropRadius * 2;
+
+                    //I didn't understand the reason to put this here but I left it here anyway
+                    if (!cropRect)
+                    {
+                        canvas.ClipRoundRect(new SKRoundRect(SKRect.Create(cropX, cropY, cropWidth, cropHeight), CropRadius * 2));
+                    }
+                }
+                else if (CropperFigure == GeometryType.Square)
+                {
+                    cropX = e.Info.Width / 2 - CropRadius;
+                    cropY = e.Info.Height / 2 - CropRadius;
+                    cropWidth = CropRadius * 2;
+                    cropHeight = CropRadius * 2;
+
+                    canvas.ClipRect(SKRect.Create(cropX, cropY, cropWidth, cropHeight));
                 }
                 else
                 {
-                    var pictureFrameCrop = SKRect.Create(imageX, imageY, e.Info.Width * imageScale, e.Info.Height * imageScale);
-                    var destCrop = pictureFrameCrop.AspectFit(new SKSize(image.Width, image.Height));
-                    canvas.DrawImage(image, destCrop);
-                    var snap = e.Surface.Snapshot();
-                    croppedImage = snap;
-                    imageData = snap.Encode().ToArray();
+                    //Rectangle crop
+                    //4:3 aspectRatio
+                    float aspectRatio = 4f / 3f;
+
+                    // I didn't think about having a way to let people change this
+                    cropWidth = e.Info.Width * 0.9f; // adjust width
+                    cropHeight = (cropWidth / aspectRatio) * 0.8f // adjust height
+
+                    //Just to ensure it fits within bounds
+                    if (cropHeight > e.Info.Height)
+                    {
+                        cropHeight = e.Info.Width * 0.7f;
+                        cropWidth = cropHeight * aspectRatio;
+                    }
+
+                    cropX = (e.Info.Width - cropWidth) / 2;
+                    cropY = (e.Info.Height - cropHeight) / 2;
+
+                    canvas.ClipRect(SKRect.Create(cropX, cropY, cropWidth, cropHeight));
                 }
-                if (EditMode)
-                    canvas.Clear(BackgroundColor != null ? BackgroundColor.ToSKColor() : SKColors.White);
-                else
-                    canvas.Clear();
+
+                var pictureFrameCrop = SKRect.Create(imageX, imageY, e.Info.Width * imageScale, e.Info.Height * imageScale);
+                var destCrop = pictureFrameCrop.AspectFit(new SKSize(image.Width, image.Height));
+                canvas.DrawImage (image, destCrop);
+
+                var snap = e.Surface.Snapshot(SKRectI.Create((int)cropX, (int)cropY, (int)cropWidth, (int)cropHeight));
+                croppedImage = snap;
+                imageData = snap.Encode().ToArray();
             }
+            
             var pictureFrame = SKRect.Create(imageX, imageY, e.Info.Width * imageScale, e.Info.Height * imageScale);
             var dest = pictureFrame.AspectFit(new SKSize(image.Width, image.Height));
             canvas.DrawImage(image, dest);
@@ -765,8 +796,28 @@ public partial class CropperImageView : ContentView
             maskPath.Close();
             if (CropperFigure == GeometryType.Circle)
                 canvas.ClipRoundRect(new SKRoundRect(SKRect.Create(e.Info.Width / 2 - CropRadius, e.Info.Height / 2 - CropRadius, CropRadius * 2, CropRadius * 2), CropRadius * 2), SKClipOperation.Difference);
-            else
+            else if (CropperFigure == GeometryType.Square)
                 canvas.ClipRect(SKRect.Create(e.Info.Width / 2 - CropRadius, e.Info.Height / 2 - CropRadius, CropRadius * 2, CropRadius * 2), SKClipOperation.Difference);
+            else
+            {
+                //Rectangle outline
+                float aspectRatio = 4f / 3f;
+
+                float cropWidth = e.Info.Width * 0.9f; //Adjust width
+                float cropHeight = (cropWidth / aspectRatio) * 0.8f;
+
+                //Just to ensure it fits within the canvas
+                if (cropHeight > e.Info.Height)
+                {
+                    cropHeight = e.Info.Height * 0.7f;
+                    cropWidth = cropHeight * aspectRatio;
+                }
+
+                float cropX = (e.Info.Width - cropWidth) / 2;
+                float cropY - (e,Info.Height - cropHeight) / 2;
+
+                canvas.ClipRect(SKRect.Create(cropX, cropY, cropWidth, cropHeight), SKClipOperation.Difference);
+            }
             canvas.DrawPaint(cropPaint);
         }
     }
