@@ -3,5 +3,6 @@
 public enum GeometryType
 {
     Circle,
-    Square
+    Square,
+    Rectangle
 }
